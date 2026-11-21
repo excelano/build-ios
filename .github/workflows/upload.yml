@@ -1,6 +1,6 @@
 name: upload
 
-run-name: upload ${{ inputs.repo }} ${{ inputs.tag }} (${{ inputs.request }})
+run-name: upload ${{ inputs.repo }} ${{ inputs.tag }}
 
 on:
   workflow_dispatch:
@@ -13,9 +13,6 @@ on:
         required: true
       ipa:
         description: The .ipa asset's name
-        required: true
-      request:
-        description: An id the caller uses to find this run
         required: true
 
 permissions:

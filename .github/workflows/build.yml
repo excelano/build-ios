@@ -1,6 +1,6 @@
 name: build
 
-run-name: build ${{ inputs.repo }} ${{ inputs.version }} (${{ inputs.request }})
+run-name: build ${{ inputs.repo }} ${{ inputs.version }}
 
 on:
   workflow_dispatch:
@@ -22,9 +22,6 @@ on:
         required: true
       scheme:
         description: The scheme to archive
-        required: true
-      request:
-        description: An id the caller uses to find this run
         required: true
 
 permissions:
