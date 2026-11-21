@@ -1,0 +1,66 @@
+name: upload
+
+run-name: upload ${{ inputs.repo }} ${{ inputs.tag }} (${{ inputs.request }})
+
+on:
+  workflow_dispatch:
+    inputs:
+      repo:
+        description: The app's repository, owner/name
+        required: true
+      tag:
+        description: The release whose .ipa is uploaded
+        required: true
+      ipa:
+        description: The .ipa asset's name
+        required: true
+      request:
+        description: An id the caller uses to find this run
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  upload:
+    runs-on: xcode-27
+    timeout-minutes: 60
+    steps:
+      - name: Fetch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ inputs.repo }}
+          TAG: ${{ inputs.tag }}
+          IPA: ${{ inputs.ipa }}
+        run: |
+          mkdir "$RUNNER_TEMP/in"
+          gh release download "$TAG" --repo "$REPO" --pattern "$IPA" --dir "$RUNNER_TEMP/in"
+          ls -l "$RUNNER_TEMP/in"
+      - name: API key
+        env:
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+        run: |
+          mkdir -p ~/.appstoreconnect/private_keys
+          printf '%s\n' "$ASC_KEY_P8" > ~/.appstoreconnect/private_keys/AuthKey_${{ vars.ASC_KEY_ID }}.p8
+      - name: Validate
+        env:
+          IPA: ${{ inputs.ipa }}
+        run: |
+          for attempt in 1 2 3; do
+            out=$(xcrun altool --validate-app -f "$RUNNER_TEMP/in/$IPA" -t ios --apiKey "${{ vars.ASC_KEY_ID }}" --apiIssuer "${{ vars.ASC_ISSUER_ID }}" 2>&1) || true
+            if printf '%s' "$out" | grep -q "VERIFY SUCCEEDED"; then echo "validated"; exit 0; fi
+            echo "attempt $attempt of 3 refused:"; printf '%s\n' "$out" | tail -n 6
+            [ "$attempt" -lt 3 ] && sleep 60
+          done
+          echo "altool would not validate $IPA in 3 tries; Apple has refused a package it then took unchanged, so this may be worth running again" >&2
+          exit 1
+      - name: Upload
+        env:
+          IPA: ${{ inputs.ipa }}
+        run: |
+          out=$(xcrun altool --upload-app -f "$RUNNER_TEMP/in/$IPA" -t ios --apiKey "${{ vars.ASC_KEY_ID }}" --apiIssuer "${{ vars.ASC_ISSUER_ID }}" 2>&1) || true
+          printf '%s\n' "$out" | tail -n 6
+          printf '%s' "$out" | grep -q "UPLOAD SUCCEEDED"
+      - name: Clean up
+        if: always()
+        run: rm -rf ~/.appstoreconnect
