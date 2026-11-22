@@ -40,18 +40,25 @@ jobs:
           mkdir -p ~/.appstoreconnect/private_keys
           printf '%s\n' "$ASC_KEY_P8" > ~/.appstoreconnect/private_keys/AuthKey_${{ vars.ASC_KEY_ID }}.p8
       - name: Validate
+        id: validate
         env:
           IPA: ${{ inputs.ipa }}
         run: |
           for attempt in 1 2 3; do
             out=$(xcrun altool --validate-app -f "$RUNNER_TEMP/in/$IPA" -t ios --apiKey "${{ vars.ASC_KEY_ID }}" --apiIssuer "${{ vars.ASC_ISSUER_ID }}" 2>&1) || true
             if printf '%s' "$out" | grep -q "VERIFY SUCCEEDED"; then echo "validated"; exit 0; fi
+            if printf '%s' "$out" | grep -q "ENTITY_ERROR.ATTRIBUTE.INVALID.DUPLICATE"; then
+              echo "App Store Connect already has this build number; nothing to upload"
+              echo "uploaded=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
             echo "attempt $attempt of 3 refused:"; printf '%s\n' "$out" | tail -n 6
             [ "$attempt" -lt 3 ] && sleep 60
           done
           echo "altool would not validate $IPA in 3 tries; Apple has refused a package it then took unchanged, so this may be worth running again" >&2
           exit 1
       - name: Upload
+        if: steps.validate.outputs.uploaded != 'true'
         env:
           IPA: ${{ inputs.ipa }}
         run: |
