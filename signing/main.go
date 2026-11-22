@@ -110,7 +110,7 @@ func run(bundle, certPath, settingsPath, keyPath, keyID, issuer, xcconfigPath, p
 		return err
 	}
 	var conf, mapping strings.Builder
-	conf.WriteString("CODE_SIGN_STYLE = Manual\nCODE_SIGN_IDENTITY = Apple Distribution\n")
+	fmt.Fprintf(&conf, "CODE_SIGN_STYLE = Manual\nCODE_SIGN_IDENTITY = Apple Distribution\nDEVELOPMENT_TEAM = %s\n", targets[0].team)
 	conf.WriteString("PROVISIONING_PROFILE_SPECIFIER = $(BUILD_IOS_PROFILE_$(PRODUCT_BUNDLE_IDENTIFIER:c99extidentifier))\n")
 	for _, t := range targets {
 		p, ok := profiles[t.bundleID]
